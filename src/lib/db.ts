@@ -44,6 +44,13 @@ function createTables(db: Database.Database) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -228,7 +235,33 @@ export function getAllSettings() {
   return out;
 }
 
+// ---- Chat Messages ----
+
+export function getChatMessages(limit = 100) {
+  const d = getDb();
+  return d
+    .prepare("SELECT * FROM chat_messages ORDER BY created_at ASC LIMIT ?")
+    .all(limit) as ChatMessage[];
+}
+
+export function insertChatMessage(msg: { role: string; content: string }) {
+  const d = getDb();
+  const id = uuid();
+  const now = new Date().toISOString();
+  d.prepare(
+    "INSERT INTO chat_messages (id, role, content, created_at) VALUES (?, ?, ?, ?)"
+  ).run(id, msg.role, msg.content, now);
+  return { id, ...msg, created_at: now } as ChatMessage;
+}
+
 // ---- Types ----
+
+export interface ChatMessage {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
+}
 
 export interface Monitor {
   id: string;

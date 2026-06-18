@@ -14,38 +14,37 @@ const WELCOME_MSG: Message = {
   content: "你好！我是 AI 市场分析助手。你可以问我关于美股市场、风险指标、经济数据等方面的问题。",
 };
 
-function loadMessages(): Message[] {
-  if (typeof window === "undefined") return [WELCOME_MSG];
-  try {
-    const raw = localStorage.getItem("chat_messages");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch { /* ignore corrupt data */ }
-  return [WELCOME_MSG];
-}
-
-function saveMessages(msgs: Message[]) {
-  try {
-    localStorage.setItem("chat_messages", JSON.stringify(msgs));
-  } catch { /* storage full or unavailable */ }
-}
-
 export default function ChatPanel() {
   const [collapsed, setCollapsed] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    fetch("/api/chat/messages")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    saveMessages(messages);
-  }, [messages]);
+  const saveMsg = useCallback(async (role: string, content: string) => {
+    try {
+      await fetch("/api/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, content }),
+      });
+    } catch { /* best effort */ }
+  }, []);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -55,6 +54,7 @@ export default function ChatPanel() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
+    saveMsg("user", text);
 
     const assistantMsg: Message = { role: "assistant", content: "" };
     setMessages((prev) => [...prev, assistantMsg]);
@@ -85,19 +85,22 @@ export default function ChatPanel() {
           return copy;
         });
       }
+      saveMsg("assistant", buffer);
     } catch (err: any) {
+      const errorContent = `[错误] ${err.message || "AI 服务暂不可用"}`;
       setMessages((prev) => {
         const copy = [...prev];
         copy[copy.length - 1] = {
           role: "assistant",
-          content: `[错误] ${err.message || "AI 服务暂不可用"}`,
+          content: errorContent,
         };
         return copy;
       });
+      saveMsg("assistant", errorContent);
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages]);
+  }, [input, loading, messages, saveMsg]);
 
   return (
     <div className="card overflow-hidden">
