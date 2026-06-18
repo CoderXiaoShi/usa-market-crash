@@ -72,6 +72,29 @@ export function getLatestSnapshot() {
     .get() as ProbabilitySnapshot | undefined;
 }
 
+export function getSnapshot(id: string) {
+  const d = getDb();
+  return d
+    .prepare("SELECT * FROM probability_snapshots WHERE id = ?")
+    .get(id) as ProbabilitySnapshot | undefined;
+}
+
+export function updateSnapshotFactors(id: string, factors: Factor[]) {
+  const d = getDb();
+  // Recompute probability from factors
+  const n = factors.length;
+  const total = factors.reduce((s, f) => s + f.impact, 0);
+  const maxTotal = n * 10;
+  const probability =
+    maxTotal === 0 ? 50 : Math.round(50 + (total / maxTotal) * 50);
+
+  d.prepare(
+    "UPDATE probability_snapshots SET factors_json = ?, probability = ? WHERE id = ?"
+  ).run(JSON.stringify(factors), Math.max(0, Math.min(100, probability)), id);
+
+  return { probability, factors };
+}
+
 export function insertSnapshot(snapshot: {
   probability: number;
   factorsJson: string;
@@ -122,6 +145,21 @@ export function updateMonitorStatus(id: string, status: "active" | "paused") {
   d.prepare("UPDATE monitors SET status = ? WHERE id = ?").run(status, id);
 }
 
+export function updateMonitor(
+  id: string,
+  updates: { name?: string; searchPrompt?: string; status?: "active" | "paused" }
+) {
+  const d = getDb();
+  const sets: string[] = [];
+  const vals: string[] = [];
+  if (updates.name) { sets.push("name = ?"); vals.push(updates.name); }
+  if (updates.searchPrompt) { sets.push("search_prompt = ?"); vals.push(updates.searchPrompt); }
+  if (updates.status) { sets.push("status = ?"); vals.push(updates.status); }
+  if (sets.length === 0) return;
+  vals.push(id);
+  d.prepare(`UPDATE monitors SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+}
+
 export function deleteMonitor(id: string) {
   const d = getDb();
   d.prepare("DELETE FROM monitors WHERE id = ?").run(id);
@@ -133,32 +171,32 @@ const DEFAULT_MONITORS = [
   {
     name: "美债利率与到期风险",
     searchPrompt:
-      "监控美国国债市场：10年期-2年期利差变化、美债拍卖bid-to-cover比率、外国持有美债占比、美联储利率政策表态。重点关注美国39万亿国债的滚动续发压力和利息支出变化。",
+      "监控美国国债市场：联邦国债总量及利息支出变化、10Y-2Y利差变化、美债拍卖bid-to-cover比率、外国官方持有美债占比（特别是中日、中东主权基金减持动向）。重点：美国39万亿国债中，约10万亿早年低息旧债将在未来一年多集中到期，必须在4%以上高利率环境续发，融资成本翻倍。高志凯框架认为这是美股根基崩塌的第一引爆点。",
   },
   {
     name: "AI泡沫与企业营收",
     searchPrompt:
-      "监控美股七大科技巨头（微软、英伟达、谷歌、Meta、苹果、亚马逊、特斯拉）的AI资本开支、实际AI营收落地、高管减持套现情况。计算AI投入产出比，关注是否有AI企业出现大额亏损或估值下调。",
+      "监控美股七大科技巨头（微软、英伟达、谷歌、Meta、苹果、亚马逊、特斯拉）的AI资本开支vs真实落地营收（当前约16:1严重失衡）、高管减持套现规模、标普500指数集中度（七巨头权重是否持续攀升）。重点：AI行业是否仍是闭环互买的账面游戏（英伟达→OpenAI→甲骨文→英伟达），是否有AI企业出现大额亏损。关键前提：美国能否通过技术封锁垄断AI红利，中国AI产业链自主能力是泡沫能否持续的试金石。高志凯框架认为这是第二引爆点。",
   },
   {
     name: "商业地产与银行坏账",
     searchPrompt:
-      "监控美国商业地产市场：写字楼空置率、CMBS违约率、中小区域银行商业地产贷款敞口。关注是否有银行出现类似硅谷银行的流动性危机信号。",
+      "监控美国商业地产市场：写字楼空置率、CMBS整体及写字楼分项违约率、中小区域银行商业地产贷款敞口及拨备覆盖率。关注是否有银行出现类似硅谷银行的流动性危机信号。美联储政策两难：若降息则通胀反弹，维持高利率则债务/股市/地产全线承压。高志凯框架认为这是崩盘放大器。",
   },
   {
     name: "VIX恐慌指数与市场情绪",
     searchPrompt:
-      "监控VIX恐慌指数、标普500波动率、信用利差（投资级与高收益债利差）、市场资金流向。如果VIX持续高于25且信用利差扩大，说明市场情绪恶化。",
+      "监控VIX恐慌指数、信用利差（投资级与高收益债利差）、标普500波动率、市场资金流向。高志凯框架认为当VIX持续高于25且信用利差扩大，意味着市场开始定价崩盘风险，恐慌情绪自我强化会加速资金撤离。",
   },
   {
-    name: "全球央行黄金储备变化",
+    name: "去美元化与央行黄金储备",
     searchPrompt:
-      "监控全球央行（特别是中国、中东、新兴市场）的黄金储备增持情况、美元在全球外汇储备中的占比变化。如果去美元化加速，说明美元信用持续受损。",
+      "监控去美元化趋势：全球央行（特别是中国、中东、新兴市场）黄金储备增持量及增持速度、美元在全球外汇储备中占比变化、主要主权财富基金（挪威GPFG、中东ADIA/KIA/PIF、新加坡GIC、中国CIC）对美股美债的减持动态、SWIFT人民币结算占比变化。高志凯框架认为美元信用受损是危机传导链的关键环节，如果去美元化加速说明美元资产定价基础在动摇。",
   },
   {
     name: "地缘政治与能源风险",
     searchPrompt:
-      "监控全球重大地缘政治事件、能源价格波动、供应链中断风险。地缘冲突会放大能源和大宗商品波动，加剧全球衰退风险。",
+      "监控全球重大地缘政治事件、能源价格波动、供应链中断风险。高志凯明确指出：地缘冲突会进一步放大风险，能源和大宗商品剧烈波动会加剧全球经济衰退，加速危机传导。",
   },
 ];
 

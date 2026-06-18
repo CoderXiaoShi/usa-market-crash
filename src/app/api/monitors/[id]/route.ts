@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMonitor, updateMonitorStatus, deleteMonitor } from "@/lib/db";
+import { getMonitor, updateMonitor, deleteMonitor } from "@/lib/db";
 
 export async function PATCH(
   req: NextRequest,
@@ -12,9 +12,11 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  if (body.status) {
-    updateMonitorStatus(id, body.status);
-  }
+  updateMonitor(id, {
+    name: body.name,
+    searchPrompt: body.searchPrompt,
+    status: body.status,
+  });
 
   return NextResponse.json({ ok: true });
 }

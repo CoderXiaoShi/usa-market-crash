@@ -8,7 +8,19 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { userInput } = await req.json();
+  const body = await req.json();
+
+  // Direct creation: name + searchPrompt provided explicitly
+  if (body.name && body.searchPrompt) {
+    const monitor = createMonitor({ name: body.name, searchPrompt: body.searchPrompt });
+    return NextResponse.json(monitor, { status: 201 });
+  }
+
+  // AI-assisted creation: parse user's natural language description
+  const userInput = body.userInput;
+  if (!userInput) {
+    return NextResponse.json({ error: "需要 userInput 或 (name + searchPrompt)" }, { status: 400 });
+  }
 
   const parsed = await parseMonitorDescription(userInput);
   if (!parsed) {
