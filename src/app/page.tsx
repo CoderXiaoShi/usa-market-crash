@@ -1,65 +1,54 @@
-import Image from "next/image";
+import { getLatestSnapshot, getAllSettings } from "@/lib/db";
+import { getLastRunTime } from "@/lib/scheduler";
+import type { Factor } from "@/lib/db";
+import ProbabilityGauge from "@/components/ProbabilityGauge";
+import ChatPanel from "@/components/ChatPanel";
+import SettingsBar from "@/components/SettingsBar";
+import ClientShell from "@/components/ClientShell";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default function HomePage() {
+  const snapshot = getLatestSnapshot();
+  const settings = getAllSettings();
+  const lastRunTime = getLastRunTime();
+
+  const probability = snapshot?.probability ?? 0;
+  const factors: Factor[] = snapshot?.factors_json
+    ? JSON.parse(snapshot.factors_json)
+    : [];
+  const summary = snapshot?.summary ?? "";
+  const frequency = settings.search_frequency || "10";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="max-w-[1200px] mx-auto px-6 py-6">
+      <div className="flex justify-between items-center mb-1 pb-4 border-b border-[var(--border)]">
+        <h1 className="text-xl font-semibold">美股崩盘概率监测</h1>
+      </div>
+
+      <div className="mt-4">
+        <SettingsBar frequency={frequency} lastRunTime={lastRunTime} />
+      </div>
+
+      <div className="grid grid-cols-[1fr_340px] gap-6 mb-6 max-md:grid-cols-1">
+        <div className="card p-8 flex flex-col items-center">
+          <ProbabilityGauge probability={probability} />
+          {summary ? (
+            <div className="mt-5 p-4 rounded-xl bg-red-500/8 border border-red-500/20 text-sm leading-relaxed text-[#d4d4d8] w-full">
+              <strong className="text-red-400">AI 综合评述：</strong>
+              {summary}
+            </div>
+          ) : (
+            <div className="mt-5 p-4 rounded-xl bg-white/[0.03] border border-[var(--border)] text-sm text-[var(--muted)] text-center w-full">
+              等待 AI 首次采集数据，检查 .env 中 LLM_API_KEY 是否已配置
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+        <ClientShell factors={factors} />
+      </div>
+
+      <ChatPanel />
     </div>
   );
 }

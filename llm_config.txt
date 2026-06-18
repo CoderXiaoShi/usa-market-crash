@@ -1,0 +1,16 @@
+大模型，使用小米的 mimo 模型
+
+MIMO_API_KEY=sk-c5cl4okm2a3c7qme1r96rfxve14zn21ypa0blu8xrwcuusaw
+MIMO_BASE_URL=https://api.xiaomimimo.com/v1
+
+
+具体的文档：
+
+模型列表
+https://mimo.mi.com/docs/zh-CN/quick-start/summary/model
+
+联网搜索
+https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/text-generation/tool-calling/web-search
+
+OpenAI API 兼容
+https://mimo.mi.com/docs/zh-CN/api/chat/openai-api
